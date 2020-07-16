@@ -1,28 +1,29 @@
 package com.lwjlol.eventbus
 
 import android.util.Log
+import android.util.LruCache
 import androidx.annotation.MainThread
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
-import com.uber.autodispose.AutoDispose
-import com.uber.autodispose.android.lifecycle.AndroidLifecycleScopeProvider
-import io.reactivex.Flowable
-import io.reactivex.android.schedulers.AndroidSchedulers
-import io.reactivex.processors.PublishProcessor
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.ConcurrentMap
-import java.util.concurrent.CopyOnWriteArrayList
+import autodispose2.AutoDispose
+import autodispose2.androidx.lifecycle.AndroidLifecycleScopeProvider
+import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
+import io.reactivex.rxjava3.processors.BehaviorProcessor
+import io.reactivex.rxjava3.processors.FlowableProcessor
+import io.reactivex.rxjava3.processors.PublishProcessor
 
 /**
  * @author luwenjie on 2019-07-05 18:11:11
  *
  * 基于 [Flowable] 使用 [PublishProcessor] 来发事件
+ * 普通事件使用 PublishProcessor: 只接收订阅之后的数据
+ * 粘性事件使用 BehaviorSubject: 会接收订阅之后
+ *
  */
 
 class EventBus private constructor() {
 
-    private val processorMap: ConcurrentMap<Class<*>, PublishProcessor<*>> = ConcurrentHashMap()
-    private val stickyEventsList: CopyOnWriteArrayList<Any> = CopyOnWriteArrayList()
+    private val processorMap: LruCache<Class<*>, FlowableProcessor<*>> = LruCache(maxSize)
 
     companion object {
         private const val TAG = "EventBus"
@@ -30,6 +31,14 @@ class EventBus private constructor() {
         @JvmStatic
         val instance: EventBus
             get() = Loader.INSTANCE
+
+        @JvmStatic
+        private var maxSize = 100
+
+        @JvmStatic
+        fun setMaxSize(maxSize: Int) {
+            this.maxSize = maxSize
+        }
     }
 
     private object Loader {
@@ -40,18 +49,17 @@ class EventBus private constructor() {
      * @param clazz 为了类型安全, 指定事件 type class
      */
     fun <T> on(clazz: Class<T>): Bus<T> {
-        return Bus(clazz, processorMap, stickyEventsList)
+        return Bus(clazz, processorMap)
     }
 
     class Bus<S>(
         private val clazz: Class<S>,
-        private val processorMap: ConcurrentMap<Class<*>, PublishProcessor<*>>,
-        private val stickyEventsList: CopyOnWriteArrayList<Any>
+        private val processorMap: LruCache<Class<*>, FlowableProcessor<*>>
     ) {
 
-        private fun ifProcessorMapGetNull(): PublishProcessor<S> {
+        private fun ifProcessorMapGetNull(): FlowableProcessor<S> {
             val processor = PublishProcessor.create<S>()
-            processorMap[clazz] = processor
+            processorMap.put(clazz, processor)
             return processor
         }
 
@@ -64,41 +72,26 @@ class EventBus private constructor() {
         @MainThread
         @Suppress("UNCHECKED_CAST")
         fun observe(
-            lifecycleOwner: LifecycleOwner, sticky: Boolean = false,
+            lifecycleOwner: LifecycleOwner,
             callback: EventCallback<S>
         ) {
-            fun subscribe(processor: PublishProcessor<S>) {
-                processor.observeOn(AndroidSchedulers.mainThread()).`as`(
-                    AutoDispose.autoDisposable(
-                        AndroidLifecycleScopeProvider.from(
-                            lifecycleOwner,
-                            Lifecycle.Event.ON_DESTROY
-                        )
+            val processor =
+                ((processorMap[clazz] ?: ifProcessorMapGetNull()) as FlowableProcessor<S>)
+            processor.observeOn(
+                AndroidSchedulers.mainThread()
+            ).to(
+                AutoDispose.autoDisposable(
+                    AndroidLifecycleScopeProvider.from(
+                        lifecycleOwner, Lifecycle.Event.ON_DESTROY
                     )
-                ).subscribe({
-                    callback(it)
-                }, {
-                    Log.d(TAG, "$it")
-                })
-            }
-            if (sticky) {
-                if (stickyEventsList.isEmpty()) {
-                    return
-                }
-                val processor = PublishProcessor.create<S>()
-                subscribe(processor)
+                )
+            ).subscribe({
+                callback(it)
+            }, {
+                // todo 出错后后面的事件都收不到了
+                Log.d(TAG, "$it")
+            })
 
-                for (i in stickyEventsList.indices) {
-                    if (clazz == stickyEventsList[i]::class.java) {
-                        val stickyEvent = stickyEventsList[i] as S
-                        processor.offer(stickyEvent)
-                        stickyEventsList.removeAt(i)
-                        break
-                    }
-                }
-            } else {
-                subscribe((processorMap[clazz] ?: ifProcessorMapGetNull()) as PublishProcessor<S>)
-            }
 
         }
     }
@@ -106,15 +99,26 @@ class EventBus private constructor() {
     @Suppress("UNCHECKED_CAST")
     fun post(event: Any, sticky: Boolean = false) {
         if (sticky) {
-            if (!stickyEventsList.contains(event)) {
-                stickyEventsList.add(event)
+            if (processorMap[event::class.java] == null) {
+                processorMap.put(event::class.java, BehaviorProcessor.create<Any>())
             }
-        } else {
-            ((processorMap[event::class.java] ?: return) as? PublishProcessor<Any>)?.run {
-                offer(event)
+        }
+        ((processorMap[event::class.java] ?: return) as? FlowableProcessor<Any>)?.run {
+            when (this) {
+                is PublishProcessor -> {
+                    offer(event)
+                }
+                is BehaviorProcessor -> {
+                    offer(event)
+                }
+                else -> {
+
+                }
             }
         }
     }
+
+    fun postSticky(event: Any) = post(event, true)
 }
 typealias EventCallback<T> = (T) -> Unit
 
