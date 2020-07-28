@@ -1,7 +1,5 @@
 提供 2 种事件总线，EventBus 和 RxBus。EventBus 做了一层包装，自动感应生命周期；RxBus 没有包装，基于 RxReley 发送事件。
 
-## EventBus
-基于 RxJava3 实现的时间总线. 自动感应 lifeOwner (Activity/fragment) 的生命周期.
 ```gradle
 implementation "com.lwjlol:rxbus:1.0.3"
 implementation 'com.uber.autodispose2:autodispose-androidx-lifecycle:2.0.0'
@@ -9,7 +7,9 @@ implementation "io.reactivex.rxjava3:rxjava:3.0.4"
 implementation 'com.jakewharton.rxrelay3:rxrelay:3.0.0'
 ```
 
-## usage
+## EventBus
+基于 RxJava3 实现的时间总线. 自动感应 lifeOwner (Activity/fragment) 的生命周期.
+
 ```
 // 设置最大缓存的事件数量
 EventBus.setMaxSize(3)
