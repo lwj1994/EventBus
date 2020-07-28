@@ -17,7 +17,7 @@ import io.reactivex.rxjava3.processors.PublishProcessor
  *
  * 基于 [Flowable] 使用 [PublishProcessor] 来发事件
  * 普通事件使用 PublishProcessor: 只接收订阅之后的数据
- * 粘性事件使用 BehaviorSubject: 会接收订阅之后
+ * 粘性事件使用 BehaviorProcessor: 会接收订阅之前的数据
  *
  */
 
@@ -88,7 +88,6 @@ class EventBus private constructor() {
             ).subscribe({
                 callback(it)
             }, {
-                // todo 出错后后面的事件都收不到了
                 Log.d(TAG, "$it")
             })
 

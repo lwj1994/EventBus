@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import com.lwjlol.eventbus.EventBus
+import com.lwjlol.eventbus.RxBus
 
 class MainActivity : AppCompatActivity() {
     companion object {
@@ -28,6 +29,16 @@ class MainActivity : AppCompatActivity() {
 
         EventBus.instance.post(EventA("222222222"))
 
+
+        RxBus.postSticky("RxBus postSticky 2")
+        RxBus.eventSticky(String::class.java).subscribe {
+            Log.d(TAG, "${it}")
+        }
+
+        RxBus.post("RxBus  2")
+        RxBus.event(String::class.java).subscribe {
+            Log.d(TAG, "${it}")
+        }
     }
 }
 

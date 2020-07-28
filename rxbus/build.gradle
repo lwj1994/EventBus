@@ -2,10 +2,10 @@ apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
 
 ext {
-    libVersion = "1.0.1"
-    groupId = "com.lwjlol.eventbus"
-    artifactId = "eventbus"
-    pkg_name = "eventbus"
+    libVersion = "1.0.3"
+    groupId = "com.lwjlol"
+    artifactId = "rxbus"
+    pkg_name = "rxbus"
     libraryDescription = 'eventbus'
     siteUrl = 'https://github.com/lwj1994/EventBus.git'
     gitUrl = 'https://github.com/lwj1994/EventBus.git'
@@ -47,6 +47,7 @@ dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
     implementation 'com.uber.autodispose2:autodispose-androidx-lifecycle:2.0.0'
     implementation "io.reactivex.rxjava3:rxjava:3.0.4"
+    implementation 'com.jakewharton.rxrelay3:rxrelay:3.0.0'
     implementation 'androidx.appcompat:appcompat:1.0.2'
     testImplementation 'junit:junit:4.12'
     androidTestImplementation 'androidx.test:runner:1.2.0'
